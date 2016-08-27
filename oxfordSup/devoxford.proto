@@ -1,0 +1,45 @@
+######################################################
+#
+# __Author__        =   Alireza Panna, NIH/NHLBI (IPL)
+# __status__        =   development
+# __date__          =   4/20/2014
+# __version__       =   1.0
+# __to-do__         =   
+# __update-log__    =   
+######################################################
+
+Terminator = CR;
+ReplyTimeout = 1000;
+
+get_string 
+{
+    out "\$1";
+    in "\$1=%s";
+    ExtraInput = Ignore;
+}
+cmd 
+{
+    out "\$1";
+}
+setD 
+{
+    out "\$1 %d";
+}
+get_val
+{
+    out "\$1";
+    in "\$1=%d";
+}
+set_xray
+{
+    out "%{XOFF|XON}";
+}
+set_pulse
+{
+    out "%{PMOFF|PMON}";
+}
+
+
+
+
+

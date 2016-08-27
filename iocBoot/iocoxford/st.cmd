@@ -1,0 +1,94 @@
+############################################################################
+< envPaths
+
+# For deviocstats
+epicsEnvSet("ENGINEER", "Alireza Panna")
+epicsEnvSet("LOCATION", "B1D521D DT-SMLIN113")
+epicsEnvSet("STARTUP","$(TOP)/iocBoot/$(IOC)")
+epicsEnvSet("ST_CMD","st.cmd")
+
+# For stream proto file
+epicsEnvSet "STREAM_PROTOCOL_PATH" "$(TOP)/db"
+
+# Change this PV according to set-up
+epicsEnvSet "P" "$(P=VPFI:OXFORD:xray)"
+epicsEnvSet "TTY" "$(TTY=/dev/ttyUSB1)"
+epicsEnvSet "CONFIG" "$(CONFIG=xray)"
+epicsEnvSet "EPICS_IOC_LOG_INET" "192.168.1.102"
+epicsEnvSet "EPICS_IOC_LOG_PORT" "7004"
+############################################################################
+# Increase size of buffer for error logging from default 1256
+errlogInit(20000)
+############################################################################
+# Register all support components
+cd $(TOP)
+dbLoadDatabase "dbd/oxford.dbd"
+oxford_registerRecordDeviceDriver pdbbase
+############################################################################
+# Set up ASYN ports
+# drvAsynSerialPortConfigure port ipInfo priority noAutoconnect noProcessEos
+drvAsynSerialPortConfigure("L0","$(TTY)",0,0,0)
+asynSetOption("L0", 0, "baud", "9600")
+asynSetOption("L0", 0, "bits", "8")
+asynSetOption("L0", 0, "parity", "none")
+asynSetOption("L0", 0, "stop", "1")
+asynSetOption("L0", 0, "clocal", "N")
+asynSetOption("L0", 0, "crtscts", "N")
+asynOctetSetInputEos("L0",  0, "\r")
+asynOctetSetOutputEos("L0", 0, "\r")
+#asynSetTraceIOMask("L0",0,0x2)
+#asynSetTraceMask("L0", 0,0x9)
+############################################################################
+# Load save_restore.cmd
+cd $(IPL_SUPPORT)
+< save_restore.cmd
+set_requestfile_path("$(TOP)", "oxfordApp/Db")
+############################################################################
+# Load record instances
+cd $(TOP)
+dbLoadRecords("db/devoxford.db","P=$(P),PORT=L0,A=0")
+dbLoadRecords("db/iocAdminSoft.db","IOC=$(P)")
+# relative paths do not work on windows!
+asSetFilename("$(IPL_SUPPORT)/security.acf")
+############################################################################
+# Start EPICS IOC
+cd $(STARTUP)
+iocInit
+############################################################################
+# Start any sequence programs
+seq(&oxford, "X=$(P)")
+############################################################################
+# Start up the autosave task and tell it what to do.
+create_monitor_set("auto_positions.req", 5, "P=$(P):")
+create_monitor_set("auto_settings.req", 30, "P=$(P):")
+
+# Handle autosave 'commands' contained in loaded databases
+# Searches through the EPICS database for info nodes named 'autosaveFields' 
+# and 'autosaveFields_pass0' and write the PV names to the files 
+# 'info_settings.req' and 'info_positions.req'
+makeAutosaveFiles()
+create_monitor_set("info_positions.req",5,"P=$(P):")
+create_monitor_set("info_settings.req",30,"P=$(P):")
+
+# For configMenu
+create_manual_set("xrayMenu.req","P=$(P):,CONFIG=$(CONFIG),CONFIGMENU=1")
+############################################################################
+# Start EPICS IOC log server
+iocLogInit()
+setIocLogDisable(0)
+############################################################################
+# Turn on caPutLogging:
+# Log values only on change to the iocLogServer:
+caPutLogInit("$(EPICS_IOC_LOG_INET):$(EPICS_IOC_LOG_PORT)",1)
+caPutLogShow(2)
+############################################################################
+# write all the PV names to a local file
+dbl > records.txt
+############################################################################
+# Set max voltage and power values after start-up
+dbpf("$(P):KVP_MAX", "90")
+dbpf("$(P):WATT_MAX", "80")
+############################################################################
+# print the time our boot was finished
+date
+############################################################################

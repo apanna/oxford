@@ -1,0 +1,271 @@
+##############################################################################
+# __Author__        =   Alireza Panna, NIH/NHLBI (IPL)
+# __status__        =   Stable
+# __date__          =   4/20/2015
+# __version__       =   1.2
+# __to-do__         =
+# __update-log__    =   4/25/2015:   record STATUS_STRING changed to mbbi
+#                                    alarm states added as well, records added
+#                                    to set min and max kV, Watts when X-ray is
+#                                    in standby mode. scan field on records
+#                                    changed to .1s
+#                       6/14/2015:   record STATUS_STRING changed to STATUS_RBV
+#                                    record FAULT changed to FAULT_RBV
+#				        12/25/2015:  added EGU and PREC fields to WATT_RBV and
+#									 KVP_RBV records
+#                       05/02/2016   Added FIRING_RBV bi record to notify when 
+#                                    kVp and Watt setpoints are reached. This
+#                                    is when we consider the xray to be firing.
+##############################################################################
+
+##############################
+# Instrument Specific commands
+##############################
+
+# Get status and fault
+record(mbbi, "$(P):STATUS_RBV")
+{
+    field(DESC, "Show current x-ray status")
+    field(DTYP, "stream")
+    field(INP, "@devoxford.proto get_string(STS) $(PORT) $(A)")
+    field(ZRST, "WARM")
+    field(ZRVL, "0")
+    field(ZRSV, "NO_ALARM")
+    field(ONST, "STAND-BY")
+    field(ONVL, "1")
+    field(ONSV, "NO_ALARM")
+    field(TWST, "OUTPUT")
+    field(TWVL, "2")
+    field(TWSV, "NO_ALARM")
+    field(THST, "PULSED")
+    field(THVL, "3")
+    field(THSV, "NO_ALARM")
+    field(FRST, "PULSING")
+    field(FRVL, "4")
+    field(FRSV, "NO_ALARM")
+    field(FVST, "FAULT")
+    field(FVVL, "6")
+    field(FVSV, "MAJOR")
+    field(PINI, "YES")
+    field(SCAN, ".1 second")
+}
+
+record(stringin, "$(P):FAULT_RBV")
+{
+    field(DESC, "Get fault")
+    field(DTYP, "stream")
+    field(INP,  "@devoxford.proto get_string(FLT) $(PORT) $(A)")
+    field(PINI, "YES")
+    field(SCAN, "1 second")
+}
+
+# Turn X-ray output on/off
+# Note: Please turn on the power supply's main X-ray OUTPUT SWITCH
+# Do not process this record on initialization.
+record(bo,"$(P):ON")
+{
+    field(DESC, "Enable x-ray output")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto set_xray $(PORT) $(A)")
+}
+
+record(ao, "$(P):KVP")
+{
+    field(DESC, "Set peak kilovolt")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(VCN) $(PORT) $(A)")
+    field(EGU, "kVp")
+    field(PREC, "0")
+    field(LOPR, "10")
+    field(HOPR, "90")
+    field(PINI, "YES")
+}
+
+record(ai, "$(P):KVP_RBV")
+{
+    field(DESC, "Get peak kilovolt")
+    field(DTYP, "stream")
+    field(INP, "@devoxford.proto get_val(VM) $(PORT) $(A)")
+    field(EGU, "kVp")
+    field(PREC, "0")
+    field(SCAN, ".1 second")
+    field(FLNK, "$(P):CALC_UA")
+}
+
+record(ao, "$(P):WATT")
+{
+    field(DESC, "Set tube power")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(WCN) $(PORT) $(A)")
+    field(EGU, "W")
+    field(PREC, "0")
+    field(LOPR, "3")
+    field(HOPR, "80")
+    field(PINI, "YES")
+}
+
+record(ai, "$(P):WATT_RBV")
+{
+    field(DESC, "Get tube power")
+    field(DTYP, "stream")
+    field(INP, "@devoxford.proto get_val(WM) $(PORT) $(A)")
+    field(EGU, "W")
+    field(PREC, "0")
+    field(SCAN, ".1 second")
+    field(FLNK, "$(P):CALC_UA")
+}
+
+# Pulse Mode
+record(bo, "$(P):PULSE_MODE")
+{
+    field(DESC, "Turn pulse mode on")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto set_pulse $(PORT) $(A)")
+}
+
+record(ao, "$(P):PULSE_WIDTH")
+{
+    field(DESC, "Set pulse width")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(PW) $(PORT) $(A)")
+    field(EGU, "ms")
+    field(PREC, "0")
+    field(LOPR, "250")
+    field(HOPR, "10000")
+    field(PINI, "YES")
+}
+
+record(ao, "$(P):PULSE")
+{
+    field(DESC, "Fire pulse")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto cmd(PEXE) $(PORT) $(A)")
+}
+
+# Standby Mode Setting min and max values
+# These are initialized after iocInit and end-user does not need to worry
+# about them
+record(ao, "$(P):KVP_MIN")
+{
+    field(DESC, "Set minimum kV in standby mode")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(VMIN) $(PORT) $(A)")
+    field(EGU, "kV")
+    field(PREC, "0")
+    field(PINI, "YES")
+}
+
+record(ao, "$(P):KVP_MAX")
+{
+    field(DESC, "Set maximum kV in standby mode")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(VMAX) $(PORT) $(A)")
+    field(EGU, "kV")
+    field(PREC, "0")
+}
+
+record(ao, "$(P):WATT_MAX")
+{
+    field(DESC, "Set maximum power in standby mode")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(WMAX) $(PORT) $(A)")
+    field(EGU, "W")
+    field(PREC, "0")
+}
+
+record(ao, "$(P):WATT_MIN")
+{
+    field(DESC, "Set minimum power in standby mode")
+    field(DTYP, "stream")
+    field(OUT, "@devoxford.proto setD(WMIN) $(PORT) $(A)")
+    field(EGU, "W")
+    field(PREC, "0")
+    field(PINI, "YES")
+}
+
+# Soft Records:
+# timer setting to kill flux if the xray is consistently firing
+record(ao, "$(P):AUTOKILL_LENGTH")
+{
+    field(DESC, "Set timer to autokill xray flux")
+    field(DTYP, "Soft Channel")
+    field(PREC, "0")
+    field(VAL, "60")
+    field(OUT, "$(P):AUTOKILL_LENGTH_RBV CA PP NMS")
+    field(PINI, "YES")
+}
+
+record(ai, "$(P):AUTOKILL_LENGTH_RBV") 
+{
+    field(DESC, "Get timer to autokill xray flux")
+    field(DTYP, "Soft Channel")
+    field(PREC, "0")
+    field(EGU, "sec")
+    field(SCAN, "Passive")
+}
+
+record(ai, "$(P):AUTOKILL_ELAPSED_RBV") 
+{
+    field(DESC, "Get elapsed time since xray on")
+    field(DTYP, "Soft Channel")
+    field(PREC, "0")
+    field(EGU, "sec")
+    field(SCAN, "1 second")
+}
+
+# controlled via sequencer
+record (ai, "$(P):MS_RBV") 
+{
+    field (DESC, "Get exposure time")
+    field (DTYP, "Soft Channel")
+    field (PREC, "9")   
+    field (EGU, "ms")
+}
+# controlled via sequencer
+record (ai, "$(P):MAS_RBV") 
+{
+    field (DESC, "Get mAs")
+    field (DTYP, "Soft Channel")
+    field (PREC, "9")   
+    field (EGU, "mAs")
+}
+
+record(calcout, "$(P):CALC_UA") 
+{
+  field (INPA,"$(P):KVP_RBV")
+  field (INPB,"$(P):WATT_RBV")
+  field (CALC, "A<.01 ? 0 : B*1*10**(3)/A")
+  field (OUT, "$(P):UA_RBV.VAL")
+  field (OOPT,"Every Time")
+  field (FLNK, "$(P):CALC_FIRING")
+} 
+
+record(longin, "$(P):UA_RBV")
+{
+  field (DESC, "Get Tube Current")
+  field (DTYP, "Soft Channel")
+  field (INP, "$(P):CALC_UA.VAL")
+  field (EGU, "UA")
+  field (SCAN, ".1 second")
+}
+
+record(calcout, "$(P):CALC_FIRING") 
+{
+  field (INPA,"$(P):KVP_MIN")
+  field (INPB,"$(P):KVP_RBV")
+  field (INPC,"$(P):WATT_MIN")
+  field (INPD,"$(P):WATT_RBV")
+  field (CALC, "A<=B&&C<=D+1 ? 1 : 0")
+  field (OOPT,"Every Time")
+  field (OUT, "$(P):FIRING_RBV.VAL")
+} 
+
+record(bi, "$(P):FIRING_RBV")
+{
+  field (DESC, "Set points reached?")
+  field (DTYP, "Soft Channel")
+  field (ZNAM, "No")
+  field (ONAM, "Yes")
+  field (INP, "$(P):CALC_FIRING.VAL")
+  field (SCAN, ".1 second")
+}
