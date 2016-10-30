@@ -16,6 +16,9 @@
 #                       05/02/2016   Added FIRING_RBV bi record to notify when 
 #                                    kVp and Watt setpoints are reached. This
 #                                    is when we consider the xray to be firing.
+#                       10/30/2016   Fix kVp setpoint reached condition in
+#                                    CALC_FIRING record so FIRING_RBV record
+#                                    enables for high kVp's
 ##############################################################################
 
 ##############################
@@ -255,7 +258,7 @@ record(calcout, "$(P):CALC_FIRING")
   field (INPB,"$(P):KVP_RBV")
   field (INPC,"$(P):WATT_MIN")
   field (INPD,"$(P):WATT_RBV")
-  field (CALC, "A<=B&&C<=D+1 ? 1 : 0")
+  field (CALC, "A<=B+1&&C<=D+1 ? 1 : 0")
   field (OOPT,"Every Time")
   field (OUT, "$(P):FIRING_RBV.VAL")
 } 
